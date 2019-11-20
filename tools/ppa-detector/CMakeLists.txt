@@ -1,10 +1,11 @@
 
-# configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake" 
-#                "${CMAKE_CURRENT_BINARY_DIR}/config.h" @ONLY
-# )
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake" 
+               "${CMAKE_CURRENT_BINARY_DIR}/config.h" @ONLY
+)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_executable(ppa-detector
+  Compiler.cpp
   main.cpp
 )
 
@@ -13,7 +14,7 @@ llvm_map_components_to_libnames(REQ_LLVM_LIBRARIES ${LLVM_TARGETS_TO_BUILD}
         analysis target mc support
 )
 
-target_link_libraries(ppa-detector ppa-comparator ${REQ_LLVM_LIBRARIES})
+target_link_libraries(ppa-detector ppa-comparator ppa-inst ${REQ_LLVM_LIBRARIES})
 
 # Platform dependencies.
 if( WIN32 )

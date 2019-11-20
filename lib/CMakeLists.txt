@@ -1,1 +1,3 @@
 add_subdirectory(Comparator)
+add_subdirectory(Instrumentation)
+add_subdirectory(Runtime)

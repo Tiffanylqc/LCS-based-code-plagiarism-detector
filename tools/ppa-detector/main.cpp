@@ -8,12 +8,13 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "InstHistComparator.h"
+#include "SEBBComparator.h"
 
 #include <memory>
 
 using namespace llvm;
 
-enum class AnalysisType { InstHist };
+enum class AnalysisType { InstHist, SEBB };
 
 static cl::OptionCategory ppaDetectorCategory{"ppa-detector options"};
 
@@ -33,12 +34,29 @@ static cl::opt<std::string> suspiciousPath{cl::Positional,
 
 static cl::opt<AnalysisType> analysisType{
     cl::desc{"Analysis type:"},
-    cl::values(clEnumValN(AnalysisType::InstHist, "instruction-histogram",
-                          "Measure similarity based on instruction histograms.")),
+    cl::values(
+        clEnumValN(AnalysisType::InstHist, "instruction-histogram",
+                   "Measure similarity based on instruction histograms"),
+        clEnumValN(AnalysisType::SEBB, "sebb",
+                   "Measure similarity based on semantically equivalent basic "
+                   "blocks")),
     cl::Required, cl::cat{ppaDetectorCategory}};
 
-static void compareInstHist(Module &p, Module &s) {
+cl::list<std::string> libPaths{
+    "L", cl::Prefix, cl::desc{"Specify a library search path"},
+    cl::value_desc{"directory"}, cl::cat{ppaDetectorCategory}};
+
+cl::list<std::string> libraries{
+    "l", cl::Prefix, cl::desc{"Specify libraries to link against"},
+    cl::value_desc{"library prefix"}, cl::cat{ppaDetectorCategory}};
+
+static void compareInstHist(Module& p, Module& s) {
   auto comparator = std::make_unique<ppa::InstHistComparator>();
+  comparator->compareModules(p, s);
+}
+
+static void compareSEBB(Module& p, Module& s) {
+  auto comparator = std::make_unique<ppa::SEBBComparator>();
   comparator->compareModules(p, s);
 }
 
@@ -77,6 +95,8 @@ int main(int argc, char** argv) {
 
   if (analysisType == AnalysisType::InstHist) {
     compareInstHist(*plaintiffModule, *suspiciousModule);
+  } else if (analysisType == AnalysisType::SEBB) {
+    compareSEBB(*plaintiffModule, *suspiciousModule);
   }
 
   return 0;
