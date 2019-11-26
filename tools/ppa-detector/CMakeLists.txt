@@ -7,6 +7,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 add_executable(ppa-detector
   Compiler.cpp
   main.cpp
+  AllFilesLoader.cpp
 )
 
 llvm_map_components_to_libnames(REQ_LLVM_LIBRARIES ${LLVM_TARGETS_TO_BUILD}

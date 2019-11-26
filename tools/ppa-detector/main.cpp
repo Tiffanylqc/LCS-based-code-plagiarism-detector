@@ -9,6 +9,7 @@
 
 #include "InstHistComparator.h"
 #include "SEBBComparator.h"
+#include "AllFilesLoader.h"
 
 #include <memory>
 
@@ -31,6 +32,14 @@ static cl::opt<std::string> suspiciousPath{cl::Positional,
                                            cl::init(""),
                                            cl::Required,
                                            cl::cat{ppaDetectorCategory}};
+
+static cl::opt<std::string> testCasesPath{
+    cl::Positional,
+    cl::desc{"<test cases>"},
+    cl::value_desc{"path to the test cases"},
+    cl::init(""),
+    cl::Required,
+    cl::cat{ppaDetectorCategory}};
 
 static cl::opt<AnalysisType> analysisType{
     cl::desc{"Analysis type:"},
@@ -56,7 +65,9 @@ static void compareInstHist(Module& p, Module& s) {
 }
 
 static void compareSEBB(Module& p, Module& s) {
-  auto comparator = std::make_unique<ppa::SEBBComparator>();
+  ppa::AllFilesLoader loader;
+  loader.Initialize(testCasesPath.getValue());
+  auto comparator = std::make_unique<ppa::SEBBComparator>(loader);
   comparator->compareModules(p, s);
 }
 
