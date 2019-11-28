@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <list>
 #include <memory>
 #include <stack>
@@ -28,6 +29,10 @@ constexpr uint64_t kEnterBasicBlock = 0xFFFFFFFFFFFFFFFE;
 constexpr uint64_t kExitBasicBlock = 0xFFFFFFFFFFFFFFFD;
 constexpr uint64_t kInputMarker = 0x0000000000000000;
 constexpr uint64_t kOutputMarker = 0x4000000000000000;
+
+constexpr double kInputRatioCutoff = 0.5;
+constexpr double kOutputRatioCutoff = 0.5;
+constexpr double kBBSimilarityCutoff = 0.5;
 
 struct BBLog {
   std::vector<uint64_t> inputs;
@@ -64,15 +69,62 @@ static RunLog readLogFromFile(uint64_t* buffer) {
   return log;
 }
 
+static int computeIntersection(std::vector<uint64_t>& p,
+                               std::vector<uint64_t>& s) {
+  int cnt = 0;
+
+  std::vector<uint64_t> sortedp(p), sorteds(s);
+  std::sort(sortedp.begin(), sortedp.end());
+  std::sort(sorteds.begin(), sorteds.end());
+  auto firstp = sortedp.begin(), lastp = sortedp.end();
+  auto firsts = sorteds.begin(), lasts = sorteds.end();
+
+  while (firstp != lastp && firsts != lasts) {
+    if (*firstp < *firsts) {
+      ++firstp;
+    } else {
+      if (*firsts == *firstp) {
+        ++cnt;
+        ++firstp;
+      }
+      ++firsts;
+    }
+  }
+
+  return cnt;
+}
+
+static double compareBBSimilarity(std::list<BBLog>& pLogs,
+                                  std::list<BBLog>& sLogs) {
+  int similar = 0;
+  for (auto& pLog : pLogs) {
+    for (auto& sLog : sLogs) {
+      int icnt = computeIntersection(pLog.inputs, sLog.inputs);
+      double iratio = (double)icnt / pLog.inputs.size();
+      if (iratio <= kInputRatioCutoff)
+        continue;
+      int ocnt = computeIntersection(pLog.outputs, sLog.outputs);
+      double oratio = (double)ocnt / pLog.outputs.size();
+      if (oratio <= kOutputRatioCutoff)
+        continue;
+      similar++;
+    }
+  }
+  double ratio = (double)similar / pLogs.size() / sLogs.size();
+  return (ratio > kBBSimilarityCutoff);
+}
+
 SEBBComparator::SEBBComparator(TestCaseLoader& loader) : loader_(loader) {}
 
 void SEBBComparator::compareModules(Module& p, Module& s) {
+  DenseMap<uint64_t, BasicBlock*> pBBMap, sBBMap;
+
   legacy::PassManager ppm, spm;
-  ppm.add(new PlaintiffPass());
+  ppm.add(new PlaintiffPass(pBBMap));
   ppm.add(createVerifierPass());
   ppm.run(p);
 
-  spm.add(new SuspiciousPass());
+  spm.add(new SuspiciousPass(sBBMap));
   spm.add(createVerifierPass());
   spm.run(s);
 
@@ -100,21 +152,15 @@ void SEBBComparator::compareModules(Module& p, Module& s) {
     RunLog suspiciousLog = readLogFromFile(buffer);
     fclose(stdin);
 
-    for (auto runLog : {plaintiffLog, suspiciousLog}) {
-      for (auto bbLog : runLog) {
-        outs() << "BB #" << bbLog.first << ", size: " << bbLog.second.size()
-               << "\n";
-        for (auto run : bbLog.second) {
-          for (auto input : run.inputs) {
-            outs() << "[I] " << input << "\n";
-          }
-          for (auto output : run.inputs) {
-            outs() << "[O] " << output << "\n";
-          }
-          outs() << "\n";
+    for (uint64_t p = 0; p < plaintiffLog.size(); ++p) {
+      for (uint64_t s = 0; s < suspiciousLog.size(); ++s) {
+        auto& pLogs = plaintiffLog[p];
+        auto& sLogs = suspiciousLog[s];
+        if (compareBBSimilarity(pLogs, sLogs)) {
+          outs() << "p[" << p << "] and s[" << s << "] are similar.\n";
         }
       }
-      outs() << "\n\n\n";
+      outs() << "\n"; 
     }
   }
 }

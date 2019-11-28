@@ -37,7 +37,7 @@ void SEBB(init)() {
   fd = open(kLogPath, O_RDWR | O_CREAT, 0666);
   SEBB(buffer) = static_cast<uint64_t*>(
       mmap(nullptr, kBufferSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-#ifndef NDEBUG
+#ifdef VERBOSELOGGING
   printf("Running\n");
 #endif
 }
@@ -47,35 +47,35 @@ void SEBB(finalize)() {
   msync(SEBB(buffer), kBufferSize, MS_SYNC);
   munmap(SEBB(buffer), kBufferSize);
   close(fd);
-#ifndef NDEBUG
+#ifdef VERBOSELOGGING
   printf("Exiting\n");
 #endif
 }
 
 void SEBB(enter)(uint64_t id) {
   dumpToLogBuffer(kEnterBasicBlock, id);
-#ifndef NDEBUG
+#ifdef VERBOSELOGGING
   printf("Entering basic block #%lu\n", id);
 #endif
 }
 
 void SEBB(exit)(uint64_t id) {
   dumpToLogBuffer(kExitBasicBlock, id);
-#ifndef NDEBUG
+#ifdef VERBOSELOGGING
   printf("Exiting basic block #%lu\n", id);
 #endif
 }
 
 void SEBB(logInput)(uint64_t id, uint64_t val) {
   dumpToLogBuffer(im(id), val);
-#ifndef NDEBUG
+#ifdef VERBOSELOGGING
   printf("Basic block %lu has a new input of value %lu\n", id, val);
 #endif
 }
 
 void SEBB(logOutput)(uint64_t id, uint64_t val) {
   dumpToLogBuffer(om(id), val);
-#ifndef NDEBUG
+#ifdef VERBOSELOGGING
   printf("Basic block %lu has a new output of value %lu\n", id, val);
 #endif
 }

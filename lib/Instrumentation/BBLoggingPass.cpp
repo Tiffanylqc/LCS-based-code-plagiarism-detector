@@ -14,8 +14,10 @@ namespace ppa {
 
 char BBLoggingPass::ID = 0;
 
+/* 
 RegisterPass<BBLoggingPass> X("BBLoggingPass",
                               "Log the inputs and outputs of basic blocks");
+*/
 
 } // namespace ppa
 
@@ -128,6 +130,9 @@ bool ppa::BBLoggingPass::runOnModule(Module& m) {
   }
 
   auto idMap = computeBasicBlockIDs(basicBlocks);
+  for (auto [k, v] : idMap) {
+    idMap_[v] = k; 
+  }
 
   auto* voidTy = Type::getVoidTy(context);
   auto* int64Ty = Type::getInt64Ty(context);
@@ -155,11 +160,11 @@ bool ppa::BBLoggingPass::runOnModule(Module& m) {
 
       auto* IDVal = builder.getInt64(ID);
       for (auto* val : computeValuedInputs(bb)) {
-        auto zext = builder.CreateZExt(val, int64Ty);
+        auto zext = builder.CreateZExtOrBitCast(val, int64Ty);
         builder.CreateCall(logInputFun, {IDVal, zext});
       }
       for (auto* val : computeOutputs(bb)) {
-        auto zext = builder.CreateZExt(val, int64Ty);
+        auto zext = builder.CreateZExtOrBitCast(val, int64Ty);
         builder.CreateCall(logOutputFun, {IDVal, zext});
       }
       builder.CreateCall(exitFun.getCallee(), {IDVal});
