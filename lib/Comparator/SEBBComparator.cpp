@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cmath>
 #include <list>
 #include <memory>
 #include <stack>
@@ -30,9 +31,9 @@ constexpr uint64_t kExitBasicBlock = 0xFFFFFFFFFFFFFFFD;
 constexpr uint64_t kInputMarker = 0x0000000000000000;
 constexpr uint64_t kOutputMarker = 0x4000000000000000;
 
-constexpr double kInputRatioCutoff = 0.5;
-constexpr double kOutputRatioCutoff = 0.5;
-constexpr double kBBSimilarityCutoff = 0.5;
+constexpr double kInputRatioCutoff = 1.0;
+constexpr double kOutputRatioCutoff = 1.0;
+constexpr double kBBSimilarityCutoff = 1.0;
 
 struct BBLog {
   std::vector<uint64_t> inputs;
@@ -100,17 +101,38 @@ static double compareBBSimilarity(std::list<BBLog>& pLogs,
   for (auto& pLog : pLogs) {
     for (auto& sLog : sLogs) {
       int icnt = computeIntersection(pLog.inputs, sLog.inputs);
-      double iratio = (double)icnt / pLog.inputs.size();
-      if (iratio <= kInputRatioCutoff)
-        continue;
+
+      double iratio = 0;
+      if (pLog.inputs.size() == 0 && sLog.inputs.size() == 0) {
+        iratio = 1;
+      } else if (pLog.inputs.size() == 0 && sLog.inputs.size() != 0) {
+        iratio = 0;
+      } else {
+        iratio = (double)icnt / pLog.inputs.size();
+      }
+
+      // if (iratio <= kInputRatioCutoff)
+      //  continue;
       int ocnt = computeIntersection(pLog.outputs, sLog.outputs);
-      double oratio = (double)ocnt / pLog.outputs.size();
-      if (oratio <= kOutputRatioCutoff)
-        continue;
-      similar++;
+      double oratio = 0;
+      if (pLog.outputs.size() == 0 && sLog.outputs.size() == 0) {
+        oratio = 1;
+      } else if (pLog.outputs.size() == 0 && sLog.outputs.size() != 0) {
+        oratio = 0;
+      } else {
+        oratio = (double)ocnt / pLog.outputs.size();
+      }
+
+      // if (oratio <= kOutputRatioCutoff)
+      //  continue;
+      // outs() << "i%:" << icnt << "/" << pLog.inputs.size() << "\n";
+      // outs() << "o%:" << ocnt << "/" << pLog.outputs.size() << "\n";
+      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff)
+        similar++;
     }
   }
-  double ratio = (double)similar / pLogs.size() / sLogs.size();
+  // outs() << similar << "/(" << pLogs.size() << "," << sLogs.size() << ")\n";
+  double ratio = (double)similar / pLogs.size();
   return (ratio > kBBSimilarityCutoff);
 }
 
@@ -151,16 +173,28 @@ void SEBBComparator::compareModules(Module& p, Module& s) {
     sys::ExecuteAndWait(kSuspiciousExePath, {kSuspiciousExePath});
     RunLog suspiciousLog = readLogFromFile(buffer);
     fclose(stdin);
-
-    for (uint64_t p = 0; p < plaintiffLog.size(); ++p) {
-      for (uint64_t s = 0; s < suspiciousLog.size(); ++s) {
+  
+    for (uint64_t p = 1; p <= plaintiffLog.size(); ++p) {
+      for (uint64_t s = 1; s <= suspiciousLog.size(); ++s) {
+        assert(plaintiffLog.count(p) == 1);
+        assert(suspiciousLog.count(s) == 1);
+        // if (s != p) continue;
         auto& pLogs = plaintiffLog[p];
         auto& sLogs = suspiciousLog[s];
-        if (compareBBSimilarity(pLogs, sLogs)) {
-          outs() << "p[" << p << "] and s[" << s << "] are similar.\n";
+        auto t = compareBBSimilarity(pLogs, sLogs);
+        if (t) {
+          if (s == p)
+            outs() << "[X]";
+          else
+            outs() << " X ";
+        } else {
+          if (s == p)
+            outs() << "[.]";
+          else
+            outs() << " . ";
         }
       }
-      outs() << "\n"; 
+      outs() << "\n";
     }
   }
 }
