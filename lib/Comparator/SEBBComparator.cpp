@@ -101,39 +101,59 @@ static double compareBBSimilarity(std::list<BBLog>& pLogs,
   for (auto& pLog : pLogs) {
     for (auto& sLog : sLogs) {
       int icnt = computeIntersection(pLog.inputs, sLog.inputs);
-
       double iratio = 0;
       if (pLog.inputs.size() == 0 && sLog.inputs.size() == 0) {
         iratio = 1;
-      } else if (pLog.inputs.size() == 0 && sLog.inputs.size() != 0) {
+      } else if (pLog.inputs.size() == 0 || sLog.inputs.size() == 0) {
         iratio = 0;
       } else {
         iratio = (double)icnt / pLog.inputs.size();
       }
 
-      // if (iratio <= kInputRatioCutoff)
-      //  continue;
       int ocnt = computeIntersection(pLog.outputs, sLog.outputs);
       double oratio = 0;
       if (pLog.outputs.size() == 0 && sLog.outputs.size() == 0) {
         oratio = 1;
-      } else if (pLog.outputs.size() == 0 && sLog.outputs.size() != 0) {
+      } else if (pLog.outputs.size() == 0 || sLog.outputs.size() == 0) {
         oratio = 0;
       } else {
         oratio = (double)ocnt / pLog.outputs.size();
       }
-
-      // if (oratio <= kOutputRatioCutoff)
-      //  continue;
-      // outs() << "i%:" << icnt << "/" << pLog.inputs.size() << "\n";
-      // outs() << "o%:" << ocnt << "/" << pLog.outputs.size() << "\n";
-      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff)
+      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff){
         similar++;
+        break;
+      }
     }
   }
-  // outs() << similar << "/(" << pLogs.size() << "," << sLogs.size() << ")\n";
-  double ratio = (double)similar / pLogs.size();
-  return (ratio > kBBSimilarityCutoff);
+  for (auto& sLog : sLogs) {
+    for (auto& pLog : pLogs) {
+      int icnt = computeIntersection(pLog.inputs, sLog.inputs);
+      double iratio = 0;
+      if (pLog.inputs.size() == 0 && sLog.inputs.size() == 0) {
+        iratio = 1;
+      } else if (pLog.inputs.size() == 0 || sLog.inputs.size() == 0) {
+        iratio = 0;
+      } else {
+        iratio = (double)icnt / sLog.inputs.size();
+      }
+
+      int ocnt = computeIntersection(pLog.outputs, sLog.outputs);
+      double oratio = 0;
+      if (pLog.outputs.size() == 0 && sLog.outputs.size() == 0) {
+        oratio = 1;
+      } else if (pLog.outputs.size() == 0 || sLog.outputs.size() == 0) {
+        oratio = 0;
+      } else {
+        oratio = (double)ocnt / sLog.outputs.size();
+      }
+      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff){
+        similar++;
+        break;
+      }
+    }
+  }
+  double ratio = (double)similar / (pLogs.size()+sLogs.size());
+  return (ratio >= kBBSimilarityCutoff);
 }
 
 SEBBComparator::SEBBComparator(TestCaseLoader& loader) : loader_(loader) {}
@@ -173,7 +193,7 @@ void SEBBComparator::compareModules(Module& p, Module& s) {
     sys::ExecuteAndWait(kSuspiciousExePath, {kSuspiciousExePath});
     RunLog suspiciousLog = readLogFromFile(buffer);
     fclose(stdin);
-  
+
     for (uint64_t p = 1; p <= plaintiffLog.size(); ++p) {
       for (uint64_t s = 1; s <= suspiciousLog.size(); ++s) {
         assert(plaintiffLog.count(p) == 1);
