@@ -70,6 +70,27 @@ static RunLog readLogFromFile(uint64_t* buffer) {
   return log;
 }
 
+using ControlFlowTraceLog = std::vector<uint64_t>;
+static ControlFlowTraceLog readCFTLogFromFile(uint64_t* buffer) {
+  ControlFlowTraceLog log;
+
+  uint32_t pos = 0;
+  std::stack<BBLog> stack;
+
+  while (buffer[pos] != kLogDelimiter) {
+    uint64_t op = buffer[pos++];
+    uint64_t val = buffer[pos++];
+
+    if (op == kEnterBasicBlock) {
+      // the dynamic CFG almost forms a tree, and
+      // we only report the post-order traversal
+    } else if (op == kExitBasicBlock) {
+      log.emplace_back(val);
+    }
+  }
+
+  return log;
+}
 static int computeIntersection(std::vector<uint64_t>& p,
                                std::vector<uint64_t>& s) {
   int cnt = 0;
@@ -93,6 +114,28 @@ static int computeIntersection(std::vector<uint64_t>& p,
   }
 
   return cnt;
+}
+
+template <class T>
+static int computeLCS(std::vector<uint64_t>& p, std::vector<uint64_t>& s,
+                      T cmp) {
+  std::vector<int> dp_data[2];
+  dp_data[0].resize(p.size() + 1);
+  dp_data[1].resize(p.size() + 1);
+
+  auto dp = [&](int i, int j) -> int& { return dp_data[i % 2][j]; };
+
+  for (size_t i = 1; i <= s.size(); i++) {
+    for (size_t j = 1; j <= p.size(); j++) {
+      if (cmp(p[j - 1], s[i - 1])) {
+        dp(i, j) = dp(i - 1, j - 1) + 1;
+      } else {
+        dp(i, j) = std::max(dp(i - 1, j), dp(i, j - 1));
+      }
+    }
+  }
+
+  return dp(s.size(), p.size());
 }
 
 static double compareBBSimilarity(std::list<BBLog>& pLogs,
@@ -119,7 +162,7 @@ static double compareBBSimilarity(std::list<BBLog>& pLogs,
       } else {
         oratio = (double)ocnt / pLog.outputs.size();
       }
-      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff){
+      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff) {
         similar++;
         break;
       }
@@ -146,13 +189,13 @@ static double compareBBSimilarity(std::list<BBLog>& pLogs,
       } else {
         oratio = (double)ocnt / sLog.outputs.size();
       }
-      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff){
+      if (iratio >= kInputRatioCutoff && oratio >= kOutputRatioCutoff) {
         similar++;
         break;
       }
     }
   }
-  double ratio = (double)similar / (pLogs.size()+sLogs.size());
+  double ratio = (double)similar / (pLogs.size() + sLogs.size());
   return (ratio >= kBBSimilarityCutoff);
 }
 
@@ -181,41 +224,50 @@ void SEBBComparator::compareModules(Module& p, Module& s) {
 
   int numTestCases = loader_.GetNumTestCases();
 
-  for (int id = 0; id < numTestCases; id++) {
+  DenseMap<uint64_t, DenseMap<uint64_t, double>> SEBB;
+
+  for (int id = 0; id < numTestCases - 1; id++) {
     StringRef testCasePath = loader_.GetTestCase(id);
 
-    freopen(testCasePath.str().c_str(), "r", stdin);
-    sys::ExecuteAndWait(kPlaintiffExePath, {kPlaintiffExePath});
+    sys::ExecuteAndWait(kPlaintiffExePath, {kPlaintiffExePath}, None,
+                        {testCasePath, StringRef(), StringRef()});
     RunLog plaintiffLog = readLogFromFile(buffer);
-    fclose(stdin);
 
-    freopen(testCasePath.str().c_str(), "r", stdin);
-    sys::ExecuteAndWait(kSuspiciousExePath, {kSuspiciousExePath});
+    sys::ExecuteAndWait(kSuspiciousExePath, {kSuspiciousExePath}, None,
+                        {testCasePath, StringRef(), StringRef()});
     RunLog suspiciousLog = readLogFromFile(buffer);
-    fclose(stdin);
 
     for (uint64_t p = 1; p <= plaintiffLog.size(); ++p) {
       for (uint64_t s = 1; s <= suspiciousLog.size(); ++s) {
-        assert(plaintiffLog.count(p) == 1);
-        assert(suspiciousLog.count(s) == 1);
         // if (s != p) continue;
         auto& pLogs = plaintiffLog[p];
         auto& sLogs = suspiciousLog[s];
         auto t = compareBBSimilarity(pLogs, sLogs);
-        if (t) {
-          if (s == p)
-            outs() << "[X]";
-          else
-            outs() << " X ";
-        } else {
-          if (s == p)
-            outs() << "[.]";
-          else
-            outs() << " . ";
-        }
+        SEBB[p][s] += t;
       }
-      outs() << "\n";
     }
+  }
+
+  const double simThreshold = 0.8 * (numTestCases - 1);
+
+  for (int id = numTestCases - 1; id < numTestCases; id++) {
+    StringRef testCasePath = loader_.GetTestCase(id);
+
+    sys::ExecuteAndWait(kPlaintiffExePath, {kPlaintiffExePath}, None,
+                        {testCasePath, StringRef(), StringRef()});
+    ControlFlowTraceLog plaintiffLog = readCFTLogFromFile(buffer);
+
+    sys::ExecuteAndWait(kSuspiciousExePath, {kSuspiciousExePath}, None,
+                        {testCasePath, StringRef(), StringRef()});
+    ControlFlowTraceLog suspiciousLog = readCFTLogFromFile(buffer);
+
+    outs() << "pSize: " << plaintiffLog.size() << "\n";
+    outs() << "sSize: " << suspiciousLog.size() << "\n";
+    outs() << "LCS:   "
+           << computeLCS(plaintiffLog, suspiciousLog,
+                         [&](uint64_t p, uint64_t s) {
+                           return SEBB[p][s] >= simThreshold;
+                         });
   }
 }
 } // namespace ppa
