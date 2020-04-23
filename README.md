@@ -1,7 +1,7 @@
-# Code Plagiarism Detector
+# LCS-based-code-plagiarism-detector
 
 ## Introduction
-This Longest Common Subsequence based detector tries to detect plagiarism in short programs like programming assignments. It considers similarity for both basic blocks and code paths. Check report [here](https://drive.google.com/file/d/1TSfQDWxjvaZfGX5b9TX6fmgHVXwXQRti/view?usp=sharing)
+This Longest Common Subsequence based detector tries to detect plagiarism in short programs like programming assignments. It considers similarity for both LLVM basic blocks and code execution paths. Check report [here](https://drive.google.com/file/d/1TSfQDWxjvaZfGX5b9TX6fmgHVXwXQRti/view?usp=sharing)
 
 
 ## Build
