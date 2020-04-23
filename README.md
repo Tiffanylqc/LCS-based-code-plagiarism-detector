@@ -1,4 +1,4 @@
-# ppa-detector
+# LCS-based-code-plagiarism-detector
 
 ## Introduction
 ppa-detector tries to detect plagiarism in short programs like those in  programming assignments. 
