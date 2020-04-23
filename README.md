@@ -1,11 +1,8 @@
-# ppa-detector
+# Code Plagiarism Detector
 
 ## Introduction
-ppa-detector tries to detect plagiarism in short programs like those in  programming assignments. 
+This Longest Common Subsequence based detector tries to detect plagiarism in short programs like programming assignments. It considers similarity for both basic blocks and code paths. Check report [here](https://drive.google.com/file/d/1TSfQDWxjvaZfGX5b9TX6fmgHVXwXQRti/view?usp=sharing)
 
-So far it has 2 methods on measuring the similarity of programs:
-+ Compute the histograms of different kinds of instructions statically and compare them with chi-squared distance. This method is demonstrative and not reliable.
-+ Identify semantically similar basic blocks with sampling and compute the longest common subsequence. 
 
 ## Build
     mkdir build && cd build
